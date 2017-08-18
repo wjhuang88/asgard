@@ -54,7 +54,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                 // 执行分发
                 it.dispatch(::runHandler)
             }
-            log.info("Bind routing path: '$first'")
+            log.info("Bind routing handler for path: '{}'", first)
         }
 
         val port = config().getInteger("port")
