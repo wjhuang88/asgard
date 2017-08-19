@@ -4,5 +4,6 @@
 *.bin*
 *.project*
 *target/*
+*.vertx/*
 .DS_Store
 profile
