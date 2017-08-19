@@ -30,6 +30,7 @@ object AsgardServer {
     @JvmOverloads
     fun run(port : Int = 8080, instance : Int = 1, vertx : Vertx = Vertx.vertx()): AsgardServer {
 
+        printBanner("banner.txt", vertx)
         log.info("Initiating Asgard core.")
 
         // 启动计时开始变量
