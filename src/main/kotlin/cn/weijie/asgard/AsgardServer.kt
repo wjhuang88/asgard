@@ -1,5 +1,7 @@
 package cn.weijie.asgard
 
+import cn.weijie.asgard.core.MainServerVerticle
+import cn.weijie.asgard.definition.*
 import io.netty.util.internal.logging.InternalLoggerFactory
 import io.netty.util.internal.logging.Log4J2LoggerFactory
 import io.vertx.core.CompositeFuture
@@ -73,11 +75,9 @@ object AsgardServer {
             }
             run(body)
         }))
-        log.info("Loaded default MIME resolver for '{}'", MIME.APPLICATION_JSON)
         it.put(MIME.TEXT_HTML, mutableListOf(::plainTextHandler))
-        log.info("Loaded default MIME resolver for '{}'", MIME.TEXT_HTML)
         it.put(MIME.TEXT_PLAIN, mutableListOf(::plainTextHandler))
-        log.info("Loaded default MIME resolver for '{}'", MIME.TEXT_PLAIN)
+        log.info("Loaded default MIME resolver for '{}', '{}', '{}'", MIME.TEXT_PLAIN, MIME.TEXT_HTML, MIME.APPLICATION_JSON)
     }
 
     /**

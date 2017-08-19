@@ -1,5 +1,6 @@
-package cn.weijie.asgard
+package cn.weijie.asgard.core
 
+import cn.weijie.asgard.definition.*
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Future
 import io.vertx.core.buffer.Buffer
@@ -27,35 +28,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     // 服务被部署时的处理方法
     override fun start() {
 
-        val router = Router.router(vertx)
-
-        // 开始处理路由分发逻辑
-        routerPool.forEach { (first, second) ->
-            router.routeWithRegex(first).handler {
-                val request = it.request()
-                val response = it.response()
-
-                // 创建协程运行用户请求处理器
-                fun runHandler(body : JsonObject) = launch(VertxContextDispatcher(vertx)) {
-                    log.debug("Received request to {}", request.uri())
-                    body.put(REQUEST_FIELD.HEADERS, JsonObject().handleParams(request.headers()))
-                            .put(REQUEST_FIELD.PARAMS, JsonObject().handleParams(request.params()))
-                            .put(REQUEST_FIELD.URI, request.uri())
-                            .put(REQUEST_FIELD.HOST, request.host())
-                            .put(REQUEST_FIELD.PATH, request.path())
-                            .put(REQUEST_FIELD.QUERY, request.query())
-                            .put(REQUEST_FIELD.COOKIES, request.cookies())
-                    val result = second(body)
-                    response.putHeader(HttpHeaders.CONTENT_TYPE,
-                            result.getString(RESPONSE_FIELD.CONTENT_TYPE, templateAdapter.contentType()))
-                    response.end(templateAdapter.resolve(result))
-                }
-
-                // 执行分发
-                it.dispatch(::runHandler)
-            }
-            log.info("Bind routing handler for path: '{}'", first)
-        }
+        val router = Router.router(vertx).register(routerPool)
 
         val port = config().getInteger("port")
         log.info("Initiating http server")
@@ -82,6 +55,37 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
         }
     }
 
+    // 路由处理器注册
+    private fun Router.register(records : MutableMap<String, suspend (JsonObject?) -> JsonObject>) = also { router ->
+        records.forEach { (first, second) ->
+            router.route(first).handler {
+                val request = it.request()
+                val response = it.response()
+                // 创建协程运行用户请求处理器
+                fun runHandler(body : JsonObject) = launch(VertxContextDispatcher(vertx)) {
+                    log.debug("Received request to {}", request.uri())
+                    body.put(REQUEST_FIELD.HEADERS, JsonObject().handleParams(request.headers()))
+                            .put(REQUEST_FIELD.PARAMS, JsonObject().handleParams(request.params()))
+                            .put(REQUEST_FIELD.URI, request.uri())
+                            .put(REQUEST_FIELD.HOST, request.host())
+                            .put(REQUEST_FIELD.PATH, request.path())
+                            .put(REQUEST_FIELD.QUERY, request.query())
+                            .put(REQUEST_FIELD.COOKIES, request.cookies())
+                    val result = second(body)
+                    response.putHeader(HttpHeaders.CONTENT_TYPE,
+                            result.getString(RESPONSE_FIELD.CONTENT_TYPE, templateAdapter.contentType()))
+                    response.end(templateAdapter.resolve(result))
+                }
+                // 执行分发
+                it.dispatch(::runHandler)
+            }
+            log.info("Bind routing handler for path: '{}'", first)
+        }
+    }
+
+    /**
+     * 按照MIME解析用户输入参数
+     */
     private fun RoutingContext.dispatch(runHandler : (JsonObject) -> Job) = when {
         request().contentType().contains(MIME.APPLICATION_FORM_URLENCODED) -> {
             request().isExpectMultipart = true
@@ -90,6 +94,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                 val params = request().params()
                 JsonObject().handleParams(formAttributes).handleParams(params).endInput(runHandler)
             }
+            this
         }
         request().contentType().contains(MIME.MULTIPART_FORM_DATA) -> { // multipart表单以及文件上传处理
             request().isExpectMultipart = true
@@ -101,6 +106,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                 val formAttributes = request().formAttributes()
                 JsonObject().put(REQUEST_FIELD.FILE_STREAM, fileList).handleParams(formAttributes).endInput(runHandler)
             }
+            this
         }
         else -> { // 默认情况搜索设置的自定义格式处理器
             val contentTypeHandlers = contentTypePool[request().contentType()] ?: listOf(::plainTextHandler)
@@ -109,6 +115,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                     handler(buf, runHandler)
                 }
             }
+            this
         }
     }
 }

@@ -1,4 +1,4 @@
-package cn.weijie.asgard
+package cn.weijie.asgard.definition
 
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder
 import io.vertx.core.MultiMap

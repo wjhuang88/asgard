@@ -1,4 +1,4 @@
-package cn.weijie.asgard
+package cn.weijie.asgard.definition
 
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.JsonObject

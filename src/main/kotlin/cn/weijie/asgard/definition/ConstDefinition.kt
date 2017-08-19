@@ -1,4 +1,4 @@
-package cn.weijie.asgard
+package cn.weijie.asgard.definition
 
 object MIME {
     const val ALL = "*/*"
