@@ -44,7 +44,7 @@ internal fun JsonObject.handleParams(attributes: MultiMap) = also { ret ->
 /**
  * 扩展方法：执行结果最终返回，提供执行方法体[runHandler]
  */
-internal fun JsonObject.endInput(runHandler : (JsonObject) -> Job) = let { runHandler(JsonObject().put(REQUEST_FIELD.INPUT, it)) }
+internal inline fun JsonObject.endInput(runHandler : (JsonObject) -> Job) = let { runHandler(JsonObject().put(REQUEST_FIELD.INPUT, it)) }
 
 /**
  * 将协程运行环境指定到[vertx]的worker线程池上

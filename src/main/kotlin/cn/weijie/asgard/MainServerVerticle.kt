@@ -20,7 +20,7 @@ import kotlinx.coroutines.experimental.launch
  */
 class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVerticle() {
 
-    private var httpServer : HttpServer? = null
+    private lateinit var httpServer : HttpServer
 
     private val log : Logger = LoggerFactory.getLogger(MainServerVerticle::class.java)
 
@@ -60,7 +60,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
         val port = config().getInteger("port")
         log.info("Initiating http server")
         httpServer = vertx.createHttpServer()
-        httpServer?.requestHandler(router::accept)?.listen(port) {
+        httpServer.requestHandler(router::accept)?.listen(port) {
             if (it.succeeded()) {
                 log.info("Http server started on port: {}.", port)
                 finishFuture.complete()
@@ -73,7 +73,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     }
 
     override fun stop() {
-        httpServer?.close {
+        httpServer.close {
             if (it.succeeded()) {
                 log.info("Server stopped.")
             } else {
