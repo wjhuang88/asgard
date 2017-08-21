@@ -10,7 +10,10 @@ import kotlinx.coroutines.experimental.Job
 internal val log : Logger = LoggerFactory.getLogger(AsgardServer::class.java)
 
 // 收集用户注册的路由处理器
-internal val routerPool = mutableMapOf<String, suspend (JsonObject?) -> JsonObject>()
+internal val routerPool = mutableSetOf<Triple<String, String, suspend (JsonObject?) -> JsonObject>>()
+
+// 静态资源路由映射
+internal val staticRouterMap = mutableMapOf<String, String>()
 
 // 收集所有Content-Type处理器
 internal val contentTypePool = mutableMapOf<String, MutableList<(Buffer, (JsonObject) -> Job) -> Unit>>()

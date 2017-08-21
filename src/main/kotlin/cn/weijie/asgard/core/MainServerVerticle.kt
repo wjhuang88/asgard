@@ -12,6 +12,7 @@ import io.vertx.core.logging.LoggerFactory
 import io.vertx.core.streams.ReadStream
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
+import io.vertx.ext.web.handler.StaticHandler
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.launch
 
@@ -28,10 +29,10 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     // 服务被部署时的处理方法
     override fun start() {
 
-        val router = Router.router(vertx).register(routerPool)
+        log.info("Initiating http server")
+        val router = Router.router(vertx).registerStatic(staticRouterMap).register(routerPool)
 
         val port = config().getInteger("port")
-        log.info("Initiating http server")
         httpServer = vertx.createHttpServer()
         httpServer.requestHandler(router::accept)?.listen(port) {
             if (it.succeeded()) {
@@ -46,19 +47,33 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     }
 
     override fun stop() {
+        log.info("Stopping http server")
         httpServer.close {
             if (it.succeeded()) {
-                log.info("Server stopped.")
+                log.info("Http server stopped.")
             } else {
-                log.error("Server stopping failed.", it.cause())
+                log.error("Http server stopping failed.", it.cause())
+            }
+        }
+    }
+
+    private fun Router.registerStatic(staticRouterMap : Map<String, String>) = also { router ->
+        if (staticRouterMap.isEmpty()) {
+            router.route("/static/*").handler(StaticHandler.create().setWebRoot("static"))
+            log.info("Bind static handler for path: '/static/*' to root: 'static'")
+        } else {
+            staticRouterMap.forEach { (path, root) ->
+                val realPath = path.prependSlash()
+                router.route(realPath).handler(StaticHandler.create().setWebRoot(root))
+                log.info("Bind static handler for path: {} to root: {}", realPath, root)
             }
         }
     }
 
     // 路由处理器注册
-    private fun Router.register(records : MutableMap<String, suspend (JsonObject?) -> JsonObject>) = also { router ->
-        records.forEach { (first, second) ->
-            router.route(first).handler {
+    private fun Router.register(records : Set<Triple<String, String, suspend (JsonObject?) -> JsonObject>>) = also { router ->
+        records.forEach { (first, second, third) ->
+            router.route(first).consumes(second).handler {
                 val request = it.request()
                 val response = it.response()
                 // 创建协程运行用户请求处理器
@@ -71,7 +86,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                             .put(REQUEST_FIELD.PATH, request.path())
                             .put(REQUEST_FIELD.QUERY, request.query())
                             .put(REQUEST_FIELD.COOKIES, request.cookies())
-                    val result = second(body)
+                    val result = third(body)
                     response.putHeader(HttpHeaders.CONTENT_TYPE,
                             result.getString(RESPONSE_FIELD.CONTENT_TYPE, templateAdapter.contentType()))
                     response.end(templateAdapter.resolve(result))
@@ -79,7 +94,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                 // 执行分发
                 it.dispatch(::runHandler)
             }
-            log.info("Bind routing handler for path: '{}'", first)
+            log.info("Bind routing handler for path: '{}' with content-type: '{}'", first, second)
         }
     }
 

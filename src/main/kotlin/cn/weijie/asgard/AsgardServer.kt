@@ -12,6 +12,7 @@ import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.DecodeException
 import io.vertx.core.json.JsonObject
 import kotlinx.coroutines.experimental.Job
+import java.util.concurrent.atomic.AtomicBoolean
 
 object AsgardServer {
 
@@ -23,27 +24,38 @@ object AsgardServer {
     private val coreInitFuture = Future.future<Nothing>()
     private val httpInitFuture = Future.future<Nothing>()
 
+    private var running : AtomicBoolean = AtomicBoolean(false)
+    private var closing : AtomicBoolean = AtomicBoolean(false)
+
+    private var vertx : Vertx? = null
+    private var serverFuture : Future<*>? = null
+
     /**
      * 在[port]端口启动服务，启动[instance]个verticle实例
      * **必要时可以提供一个你自己的[vertx]对象作为服务启动的上下文 - 这是可选的**
      */
     @JvmOverloads
-    fun run(port : Int = 8080, instance : Int = 1, vertx : Vertx = Vertx.vertx()): AsgardServer {
+    fun run(port : Int = 8080, vertx : Vertx = Vertx.vertx()) {
 
+        if (running.get()) {
+            log.warn("Asgard server is running, no new server will be created")
+            return
+        }
+        running.getAndSet(true)
+        this.vertx = vertx
+        closing.getAndSet(false)
         printBanner("banner.txt", vertx)
-        log.info("Initiating Asgard core.")
-
+        log.info("Initiating Asgard core")
         // 启动计时开始变量
         val start = System.currentTimeMillis()
-
         // 加入默认处理器
         contentTypePool.contentTypeInit()
 
         // 部署服务
         log.info("Initiating vert.x core")
         vertx.deployVerticle(MainServerVerticle(httpInitFuture), DeploymentOptions()
-                        .setInstances(instance)
-                        .setConfig(JsonObject().put("port", port))) {
+                .setInstances(1)
+                .setConfig(JsonObject().put("port", port))) {
             if (it.succeeded()) {
                 coreInitFuture.complete()
             } else {
@@ -52,14 +64,39 @@ object AsgardServer {
         }
 
         // 服务启动完毕
-        CompositeFuture.all(coreInitFuture, httpInitFuture).setHandler {
+        serverFuture = CompositeFuture.all(coreInitFuture, httpInitFuture).setHandler {
             if (it.succeeded()) {
                 log.info("App deployed, took {} ms", System.currentTimeMillis() - start)
             } else {
                 log.info("App deploying failed 'cause of : {}", it.cause().localizedMessage)
             }
         }
-        return this
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            if (!closing.get()) {
+                shutdown()
+            }
+        })
+    }
+
+    /**
+     * 关闭服务
+     */
+    fun shutdown() {
+        closing.getAndSet(true)
+        while (serverFuture?.isComplete != true) {
+            Thread.sleep(100)
+        }
+        log.info("Shutting down Asgard server")
+        val closeFuture = Future.future<Nothing>()
+        vertx?.close {
+            log.info("Vert.x core closed")
+            closeFuture.complete()
+            vertx = null
+        }
+        while (!closeFuture.isComplete) {
+            Thread.sleep(100)
+        }
     }
 
     // 扩展方法定义：加入默认content-type处理器
@@ -82,20 +119,28 @@ object AsgardServer {
     }
 
     /**
-     * 注册路由处理器，需要提供路径正则表达式[pathPattern]和处理器[handler]
+     * 注册路由处理器，需要提供路径[pathPattern]和处理器[handler]
      */
-    fun route(pathPattern : String, handler : suspend (JsonObject?) -> JsonObject): AsgardServer {
-        routerPool.put(if (pathPattern.startsWith("/")) pathPattern else "/$pathPattern", handler)
+    fun route(pathPattern : String, contentType: String = MIME.ALL, handler : suspend (JsonObject?) -> JsonObject): AsgardServer {
+        routerPool.add(Triple(pathPattern.prependSlash(), contentType, handler))
         return this
     }
 
     /**
-     * 注册路由处理器，需要提供路径正则表达式[pathPattern]和处理器[handler]，非suspend版本
+     * 注册路由处理器，需要提供路径[pathPattern]和处理器[handler]，非suspend版本
      * @see route
      */
-    fun route(pathPattern : String, handler : (JsonObject?) -> JsonObject): AsgardServer {
-        routerPool.put(if (pathPattern.startsWith("/")) pathPattern else "/$pathPattern", { handler.invoke(it) })
+    @JvmOverloads
+    fun route(pathPattern : String, contentType: String = MIME.ALL, handler : (JsonObject?) -> JsonObject): AsgardServer {
+        routerPool.add(Triple(pathPattern.prependSlash(), contentType, { it -> handler(it) }))
         return this
+    }
+
+    /**
+     * 注册静态资路由信息，将[path]路由到[root]目录中
+     */
+    fun routeStatic(path : String, root : String) {
+        staticRouterMap.put(path, root)
     }
 
     /**

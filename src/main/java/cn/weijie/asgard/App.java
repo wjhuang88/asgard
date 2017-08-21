@@ -2,8 +2,8 @@ package cn.weijie.asgard;
 
 public class App {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         AsgardServer server = AsgardServer.INSTANCE;
-        server.route("test", requestBody -> requestBody.put("sig", "response")).run();
+        server.route("test/:id", requestBody -> requestBody.put("sig", "response")).run();
     }
 }

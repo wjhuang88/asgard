@@ -47,6 +47,11 @@ internal fun JsonObject.handleParams(attributes: MultiMap) = also { ret ->
 internal inline fun JsonObject.endInput(runHandler : (JsonObject) -> Job) = let { runHandler(JsonObject().put(REQUEST_FIELD.INPUT, it)) }
 
 /**
+ * 扩展方法：如果字符串不是"/"开头就添加"/"
+ */
+internal fun String.prependSlash() = if (this.startsWith("/")) this else "/$this"
+
+/**
  * 将协程运行环境指定到[vertx]的worker线程池上
  */
 open class VertxContextDispatcher(private val vertx: Vertx) : CoroutineDispatcher() {
