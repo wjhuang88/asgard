@@ -3,16 +3,19 @@ package cn.weijie.asgard.core
 import cn.weijie.asgard.definition.*
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Future
-import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpHeaders
+import io.vertx.core.http.HttpMethod
 import io.vertx.core.http.HttpServer
 import io.vertx.core.json.JsonObject
 import io.vertx.core.logging.Logger
 import io.vertx.core.logging.LoggerFactory
-import io.vertx.core.streams.ReadStream
 import io.vertx.ext.web.Router
 import io.vertx.ext.web.RoutingContext
+import io.vertx.ext.web.handler.BodyHandler
+import io.vertx.ext.web.handler.CookieHandler
+import io.vertx.ext.web.handler.SessionHandler
 import io.vertx.ext.web.handler.StaticHandler
+import io.vertx.ext.web.sstore.LocalSessionStore
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.launch
 
@@ -30,7 +33,14 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     override fun start() {
 
         log.info("Initiating http server")
-        val router = Router.router(vertx).registerStatic(staticRouterMap).register(routerPool)
+        val store = sessionStore?: LocalSessionStore.create(vertx)
+
+        val router = Router.router(vertx)
+        router.route().handler(CookieHandler.create())
+        router.route().handler(SessionHandler.create(store))
+        router.route().handler(BodyHandler.create())
+
+        router.registerStatic(staticRouterMap).register(routerPool)
 
         val port = config().getInteger("port")
         httpServer = vertx.createHttpServer()
@@ -71,22 +81,34 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     }
 
     // 路由处理器注册
-    private fun Router.register(records : Set<Triple<String, String, suspend (JsonObject?) -> JsonObject>>) = also { router ->
-        records.forEach { (first, second, third) ->
-            router.route(first).consumes(second).handler {
+    private fun Router.register(records : Set<Quadruple<String, String, HttpMethod?, suspend (JsonObject?) -> JsonObject>>) = also { router ->
+        records.forEach { (routePath, contentType, httpMethod, routeHandler) ->
+            val registerHandler: (RoutingContext) -> Unit = {it: RoutingContext ->
                 val request = it.request()
                 val response = it.response()
                 // 创建协程运行用户请求处理器
-                fun runHandler(body : JsonObject) = launch(VertxContextDispatcher(vertx)) {
-                    log.debug("Received request to {}", request.uri())
+                fun runHandler(body : JsonObject) = launch(VertxContextDispatcher) {
+                    if (log.isDebugEnabled) {
+                        log.debug("Received request to {}", request.uri())
+                    }
+                    // 业务代码输入对象中加入请求信息
                     body.put(REQUEST_FIELD.HEADERS, JsonObject().handleParams(request.headers()))
                             .put(REQUEST_FIELD.PARAMS, JsonObject().handleParams(request.params()))
                             .put(REQUEST_FIELD.URI, request.uri())
                             .put(REQUEST_FIELD.HOST, request.host())
                             .put(REQUEST_FIELD.PATH, request.path())
                             .put(REQUEST_FIELD.QUERY, request.query())
-                            .put(REQUEST_FIELD.COOKIES, request.cookies())
-                    val result = third(body)
+                            .put(REQUEST_FIELD.COOKIES, CookieResolver(it))
+                            .put(REQUEST_FIELD.SESSION, SessionResolver(it))
+                    it.fileUploads().let { files ->
+                        if (!files.isEmpty()) {
+                            body.put(REQUEST_FIELD.UPLOAD_FILES, files)
+                        }
+                    }
+                    if (log.isDebugEnabled) {
+                        log.debug("Request data: {}", body)
+                    }
+                    val result = routeHandler(body)
                     response.putHeader(HttpHeaders.CONTENT_TYPE,
                             result.getString(RESPONSE_FIELD.CONTENT_TYPE, templateAdapter.contentType()))
                     response.end(templateAdapter.resolve(result))
@@ -94,43 +116,22 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                 // 执行分发
                 it.dispatch(::runHandler)
             }
-            log.info("Bind routing handler for path: '{}' with content-type: '{}'", first, second)
+            if (httpMethod != null) {
+                router.route(routePath).consumes(contentType).method(httpMethod).handler(registerHandler)
+            } else {
+                router.route(routePath).consumes(contentType).handler(registerHandler)
+            }
+            log.info("Bind routing handler for path: '{}' with content-type: '{}' via method: '{}'", routePath, contentType, httpMethod ?: "*")
         }
     }
 
     /**
      * 按照MIME解析用户输入参数
      */
-    private fun RoutingContext.dispatch(runHandler : (JsonObject) -> Job) = when {
-        request().contentType().contains(MIME.APPLICATION_FORM_URLENCODED) -> {
-            request().isExpectMultipart = true
-            request().endHandler {
-                val formAttributes = request().formAttributes()
-                val params = request().params()
-                JsonObject().handleParams(formAttributes).handleParams(params).endInput(runHandler)
-            }
-            this
-        }
-        request().contentType().contains(MIME.MULTIPART_FORM_DATA) -> { // multipart表单以及文件上传处理
-            request().isExpectMultipart = true
-            val fileList = mutableListOf<ReadStream<Buffer>>()
-            request().uploadHandler { upload ->
-                fileList.add(upload)
-            }
-            request().endHandler {
-                val formAttributes = request().formAttributes()
-                JsonObject().put(REQUEST_FIELD.FILE_STREAM, fileList).handleParams(formAttributes).endInput(runHandler)
-            }
-            this
-        }
-        else -> { // 默认情况搜索设置的自定义格式处理器
-            val contentTypeHandlers = contentTypePool[request().contentType()] ?: listOf(::plainTextHandler)
-            request().bodyHandler { buf ->
-                contentTypeHandlers.forEach { handler ->
-                    handler(buf, runHandler)
-                }
-            }
-            this
+    private fun RoutingContext.dispatch(runHandler : (JsonObject) -> Job) = also {
+        val contentTypeHandlers = contentTypePool[request().contentType()] ?: listOf(::plainTextHandler)
+        contentTypeHandlers.forEach { handler ->
+            handler(body, runHandler)
         }
     }
 }

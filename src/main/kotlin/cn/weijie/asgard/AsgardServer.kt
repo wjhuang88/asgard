@@ -2,6 +2,8 @@ package cn.weijie.asgard
 
 import cn.weijie.asgard.core.MainServerVerticle
 import cn.weijie.asgard.definition.*
+import cn.weijie.asgard.dispacher.AnnotationReader
+import cn.weijie.asgard.tool.ClasspathPackageScanner
 import io.netty.util.internal.logging.InternalLoggerFactory
 import io.netty.util.internal.logging.Log4J2LoggerFactory
 import io.vertx.core.CompositeFuture
@@ -9,8 +11,10 @@ import io.vertx.core.DeploymentOptions
 import io.vertx.core.Future
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
+import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.DecodeException
 import io.vertx.core.json.JsonObject
+import io.vertx.ext.web.sstore.SessionStore
 import kotlinx.coroutines.experimental.Job
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -50,9 +54,12 @@ object AsgardServer {
         val start = System.currentTimeMillis()
         // 加入默认处理器
         contentTypePool.contentTypeInit()
+        // 设置协程执行环境
+        VertxContextDispatcher.setVertx(vertx)
 
         // 部署服务
         log.info("Initiating vert.x core")
+        scanRunner()
         vertx.deployVerticle(MainServerVerticle(httpInitFuture), DeploymentOptions()
                 .setInstances(1)
                 .setConfig(JsonObject().put("port", port))) {
@@ -119,20 +126,32 @@ object AsgardServer {
     }
 
     /**
-     * 注册路由处理器，需要提供路径[pathPattern]和处理器[handler]
+     * 注册路由处理器，必须提供路径[pathPattern]和处理器[handler]，
+     * 如果需要可以规定处理的MIME类型[contentType]和请求方法[method]
      */
-    fun route(pathPattern : String, contentType: String = MIME.ALL, handler : suspend (JsonObject?) -> JsonObject): AsgardServer {
-        routerPool.add(Triple(pathPattern.prependSlash(), contentType, handler))
+    fun route(
+            pathPattern : String,
+            contentType: String = MIME.ALL,
+            method: HttpMethod? = null,
+            handler : suspend (JsonObject?) -> JsonObject
+    ): AsgardServer {
+        routerPool.add(Quadruple(pathPattern.prependSlash(), contentType, method, handler))
         return this
     }
 
     /**
-     * 注册路由处理器，需要提供路径[pathPattern]和处理器[handler]，非suspend版本
+     * 注册路由处理器，必须提供路径[pathPattern]和处理器[handler]，
+     * 如果需要可以规定处理的MIME类型[contentType]和请求方法[method]，非suspend版本
      * @see route
      */
     @JvmOverloads
-    fun route(pathPattern : String, contentType: String = MIME.ALL, handler : (JsonObject?) -> JsonObject): AsgardServer {
-        routerPool.add(Triple(pathPattern.prependSlash(), contentType, { it -> handler(it) }))
+    fun route(
+            pathPattern : String,
+            contentType: String = MIME.ALL,
+            method: HttpMethod? = null,
+            handler : (JsonObject?) -> JsonObject
+    ): AsgardServer {
+        routerPool.add(Quadruple(pathPattern.prependSlash(), contentType, method, { it -> handler(it) }))
         return this
     }
 
@@ -158,6 +177,34 @@ object AsgardServer {
     fun useTemplateAdapter(adapter : TemplateAdapter): AsgardServer {
         templateAdapter = adapter
         return this
+    }
+
+    /**
+     * 注册session存储
+     */
+    fun useSessionStore(store: SessionStore) {
+        sessionStore = store
+    }
+
+    private var scanRunner: () -> Unit = {}
+
+    /**
+     * 扫描包路径[packageName]下的所有业务类
+     */
+    fun scan(packageName: String) {
+        scanRunner = {
+            try {
+                ClasspathPackageScanner(packageName).fullyQualifiedClassNameList.forEach {
+                    val annotationReader = AnnotationReader(Class.forName(it))
+                    if (log.isDebugEnabled) {
+                        log.debug("Loading {} class: {}", annotationReader.endpointTypeName, it)
+                    }
+                }
+            } catch (e: Exception) {
+                log.error("Scan package: $packageName fail", e)
+            }
+        }
+
     }
 }
 
