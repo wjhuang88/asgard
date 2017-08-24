@@ -19,15 +19,17 @@ object REQUEST_FIELD {
     const val INPUT = "input"
     const val HEADERS = "headers"
     const val COOKIES = "cookies"
+    const val SESSION = "session"
     const val PARAMS = "params"
     const val URI = "uri"
     const val QUERY = "query"
     const val HOST = "host"
     const val PATH = "path"
-    const val FILE_STREAM = "fileStream"
+    const val UPLOAD_FILES = "uploadFiles"
 }
 
 object RESPONSE_FIELD {
     const val CONTENT_TYPE = "content-type"
     const val TEMPLATE = "x_template"
+    const val DATA = "data"
 }

@@ -1,12 +1,12 @@
 @file:JvmName("BannerPrinter")
 package cn.weijie.asgard
 
-import io.vertx.core.Vertx
+import cn.weijie.asgard.definition.prependSlash
 
-fun printBanner(file: String, vertx: Vertx) {
-    vertx.fileSystem().let {
-        if (it.existsBlocking(file)) {
-            it.readFileBlocking(file).toString().let { println(it) }
+fun printBanner(file: String) {
+    AsgardServer::class.java.getResourceAsStream(file.prependSlash()).let {
+        if (null != it && it.available() > 0) {
+            it.bufferedReader().readText().let { println(it) }
         } else {
             println()
             println(":::: Asgard server ::::")
