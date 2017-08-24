@@ -21,7 +21,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 object AsgardServer {
 
     init {
+        printBanner("banner.txt")
         System.setProperty("vertx.logger-delegate-factory-class-name", "io.vertx.core.logging.Log4j2LogDelegateFactory")
+        System.setProperty("Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector")
         InternalLoggerFactory.setDefaultFactory(Log4J2LoggerFactory.INSTANCE)
     }
 
@@ -48,7 +50,6 @@ object AsgardServer {
         running.getAndSet(true)
         this.vertx = vertx
         closing.getAndSet(false)
-        printBanner("banner.txt", vertx)
         log.info("Initiating Asgard core")
         // 启动计时开始变量
         val start = System.currentTimeMillis()
@@ -57,9 +58,12 @@ object AsgardServer {
         // 设置协程执行环境
         VertxContextDispatcher.setVertx(vertx)
 
-        // 部署服务
         log.info("Initiating vert.x core")
+
+        // 目录扫描执行
         scanRunner()
+
+        // 部署服务
         vertx.deployVerticle(MainServerVerticle(httpInitFuture), DeploymentOptions()
                 .setInstances(1)
                 .setConfig(JsonObject().put("port", port))) {
@@ -79,6 +83,7 @@ object AsgardServer {
             }
         }
 
+        // 注册关闭事件
         Runtime.getRuntime().addShutdownHook(Thread {
             if (!closing.get()) {
                 shutdown()
@@ -115,7 +120,7 @@ object AsgardServer {
                 try {
                     JsonObject().put(REQUEST_FIELD.INPUT, buf.toJsonArray())
                 } catch (e : DecodeException) {
-                    JsonObject().put(REQUEST_FIELD.INPUT, "{}")
+                    JsonObject().put(REQUEST_FIELD.INPUT, JsonObject())
                 }
             }
             run(body)
@@ -131,7 +136,7 @@ object AsgardServer {
      */
     fun route(
             pathPattern : String,
-            contentType: String = MIME.ALL,
+            contentType: Pair<String, String?> = Pair(MIME.ALL, null),
             method: HttpMethod? = null,
             handler : suspend (JsonObject?) -> JsonObject
     ): AsgardServer {
@@ -147,7 +152,7 @@ object AsgardServer {
     @JvmOverloads
     fun route(
             pathPattern : String,
-            contentType: String = MIME.ALL,
+            contentType: Pair<String, String?> = Pair(MIME.ALL, null),
             method: HttpMethod? = null,
             handler : (JsonObject?) -> JsonObject
     ): AsgardServer {
@@ -197,8 +202,9 @@ object AsgardServer {
                 ClasspathPackageScanner(packageName).fullyQualifiedClassNameList.forEach {
                     val annotationReader = AnnotationReader(Class.forName(it))
                     if (log.isDebugEnabled) {
-                        log.debug("Loading {} class: {}", annotationReader.endpointTypeName, it)
+                        log.debug("Resolving {} class: {}", annotationReader.endpointTypeName, it)
                     }
+                    annotationReader.resolver?.resolve(this)
                 }
             } catch (e: Exception) {
                 log.error("Scan package: $packageName fail", e)

@@ -1,9 +1,12 @@
 package cn.weijie.asgard.definition
 
+import com.google.common.collect.Maps
 import io.vertx.core.buffer.Buffer
+import io.vertx.core.json.Json
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.Cookie
 import io.vertx.ext.web.RoutingContext
+import io.vertx.ext.web.Session
 import java.io.Serializable
 
 /**
@@ -91,18 +94,41 @@ class CookieResolver(private val rc: RoutingContext) : MutableMap<String, JsonOb
     fun addCookie(name: String, value: String) = rc.addCookie(Cookie.cookie(name, value))
     fun getCookie(name: String) = rc.getCookie(name)
     fun removeCookie(name: String) = rc.removeCookie(name)
+
+    override fun toString(): String {
+        return mapToString(this)
+    }
 }
 
 /**
- * 定义session处理器
+ * 定义session处理器，需要提供路由请求上下文对象[rc]
  */
-class SessionResolver(private val rc: RoutingContext) : MutableMap<String, JsonObject>
-        by rc.session().data().mapValuesTo(LinkedHashMap(), { (_, value) -> JsonObject.mapFrom(value)}) {
+class SessionResolver(private val rc: RoutingContext) : MutableMap<String, String> by rc.session().transToMap() {
 
-    fun addSession(name: String, value: Any) = rc.session().put(name, value)
+    fun addSession(name: String, value: Any): Session = rc.session().put(name, value)
     fun <T> getSession(name: String) = rc.session().get<T>(name)
     fun <T> removeSession(name: String) = rc.session().remove<T>(name)
+
+    override fun toString(): String {
+        return mapToString(this)
+    }
 }
+
+/**
+ * 创建一个Session对象的代理Map
+ */
+private fun Session.transToMap() = data().let({
+    Maps.transformValues(it, {
+        value -> when(value) {
+            is String -> value
+            is Number, is Boolean, is Char -> value.toString()
+            else -> Json.encode(value)
+        }
+    })
+})
+private fun <K, V> mapToString(map: Map<K, V>): String = map.entries.joinToString(", ", "{", "}") { mapToString(map, it) }
+private fun <K, V> mapToString(map: Map<K, V>, entry: Map.Entry<K, V>): String = mapToString(map, entry.key) + "=" + mapToString(map, entry.value)
+private fun <K, V> mapToString(map: Map<K, V>, o: Any?): String = if (o === map) "(this Map)" else o.toString()
 
 /**
  * 定义四元组
@@ -115,5 +141,4 @@ data class Quadruple<out A, out B, out C, out D>(
 ) : Serializable {
     override fun toString(): String = "($first, $second, $third, $forth)"
 }
-
 fun <T> Quadruple<T, T, T, T>.toList(): List<T> = listOf(first, second, third, forth)

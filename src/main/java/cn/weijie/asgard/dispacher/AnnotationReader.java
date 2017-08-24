@@ -13,7 +13,9 @@ public class AnnotationReader<T> {
 
     private Class<? extends Annotation> annotation;
 
-    private String typeName;
+    private String typeName = "Unknown";
+
+    private EndpointResolver resolver;
 
     @SuppressWarnings("unchecked")
     public AnnotationReader(Class<T> target) {
@@ -21,6 +23,7 @@ public class AnnotationReader<T> {
         if (isRPC()) {
             typeName = "RPC";
             annotation = RPC.class;
+            resolver = new RPCResolver(target);
         } else if (isRestful()) {
             typeName = "RESTful";
             annotation = ResourcePath.class;
@@ -33,8 +36,6 @@ public class AnnotationReader<T> {
         } else if (isStatic()) {
             typeName = "Static";
             annotation = WebRoot.class;
-        } else {
-            typeName = "Unknown";
         }
     }
 
@@ -58,11 +59,19 @@ public class AnnotationReader<T> {
         return clazz.isAnnotationPresent(WebRoot.class);
     }
 
+    public boolean is(Class<? extends Annotation> annotation) {
+        return clazz.isAnnotationPresent(annotation);
+    }
+
     public String getEndpointTypeName() {
         return typeName;
     }
 
     public Class<? extends Annotation> getEndpointTypeClass() {
         return annotation;
+    }
+
+    public EndpointResolver getResolver() {
+        return resolver;
     }
 }

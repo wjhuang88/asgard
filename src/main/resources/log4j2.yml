@@ -4,7 +4,7 @@ Configuration:
     Property:
       -
         name: CONSOLE_LOG_PATTERN
-        value: "%style{%d{yyyy-MM-dd HH:mm:ss.SSS}}{white} %highlight{%5p} %style{%pid}{magenta} %style{---}{white} %style{[%25.25t]}{white} %style{%-40.40c}{blue} %style{:}{white} %style{%m%n%ex}{bright}"
+        value: "%style{%d{yyyy-MM-dd HH:mm:ss.SSS}}{white} %highlight{%5p} %style{%pid}{magenta} %style{---}{white} %style{[%25.25t]}{white} %style{%-40.40c}{blue} %style{:}{white} %style{%m%n}{bright}%style{%ex}{red}"
       -
         name: FILE_LOG_PATTERN
         value: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p --- [%t] %-40.40c{1.} : %m%n%ex"

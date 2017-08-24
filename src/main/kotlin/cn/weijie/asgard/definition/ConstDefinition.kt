@@ -31,4 +31,5 @@ object REQUEST_FIELD {
 object RESPONSE_FIELD {
     const val CONTENT_TYPE = "content-type"
     const val TEMPLATE = "x_template"
+    const val DATA = "data"
 }

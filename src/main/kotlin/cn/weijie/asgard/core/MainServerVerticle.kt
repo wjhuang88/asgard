@@ -81,7 +81,7 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
     }
 
     // 路由处理器注册
-    private fun Router.register(records : Set<Quadruple<String, String, HttpMethod?, suspend (JsonObject?) -> JsonObject>>) = also { router ->
+    private fun Router.register(records : Set<Quadruple<String, Pair<String, String?>, HttpMethod?, suspend (JsonObject?) -> JsonObject>>) = also { router ->
         records.forEach { (routePath, contentType, httpMethod, routeHandler) ->
             val registerHandler: (RoutingContext) -> Unit = {it: RoutingContext ->
                 val request = it.request()
@@ -109,18 +109,21 @@ class MainServerVerticle(private val finishFuture: Future<Nothing>) : AbstractVe
                         log.debug("Request data: {}", body)
                     }
                     val result = routeHandler(body)
-                    response.putHeader(HttpHeaders.CONTENT_TYPE,
-                            result.getString(RESPONSE_FIELD.CONTENT_TYPE, templateAdapter.contentType()))
+                    val resContentType = contentType.second ?: templateAdapter.contentType()
+                    response.putHeader(HttpHeaders.CONTENT_TYPE, resContentType)
                     response.end(templateAdapter.resolve(result))
                 }
                 // 执行分发
                 it.dispatch(::runHandler)
             }
-            if (httpMethod != null) {
-                router.route(routePath).consumes(contentType).method(httpMethod).handler(registerHandler)
-            } else {
-                router.route(routePath).consumes(contentType).handler(registerHandler)
+            val route = router.route(routePath).consumes(contentType.first)
+            if (null != contentType.second && contentType.second != MIME.ALL) {
+                route.produces(contentType.second)
             }
+            if (httpMethod != null) {
+                route.method(httpMethod)
+            }
+            route.handler(registerHandler)
             log.info("Bind routing handler for path: '{}' with content-type: '{}' via method: '{}'", routePath, contentType, httpMethod ?: "*")
         }
     }

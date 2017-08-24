@@ -1,13 +1,12 @@
 package cn.weijie.asgard.definition
 
-import io.netty.handler.codec.http.cookie.ServerCookieDecoder
+import cn.weijie.asgard.definition.VertxContextDispatcher.vertx
 import io.vertx.core.MultiMap
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.http.HttpHeaders
 import io.vertx.core.http.HttpServerRequest
 import io.vertx.core.json.JsonObject
-import io.vertx.ext.web.impl.CookieImpl
 import kotlinx.coroutines.experimental.CoroutineDispatcher
 import kotlinx.coroutines.experimental.Job
 import kotlin.coroutines.experimental.CoroutineContext
@@ -36,11 +35,6 @@ internal fun JsonObject.handleParams(attributes: MultiMap) = also { ret ->
         }
     }
 }
-
-/**
- * 扩展方法：执行结果最终返回，提供执行方法体[runHandler]
- */
-internal inline fun JsonObject.endInput(runHandler : (JsonObject) -> Job) = let { runHandler(JsonObject().put(REQUEST_FIELD.INPUT, it)) }
 
 /**
  * 扩展方法：如果字符串不是"/"开头就添加"/"

@@ -12,5 +12,5 @@ import java.lang.annotation.Target;
 @Inherited
 @Documented
 public @interface Action {
-    String value() default "do";
+    String value() default "";
 }

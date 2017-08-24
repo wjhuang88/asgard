@@ -12,5 +12,5 @@ import java.lang.annotation.Target;
 @Inherited
 @Documented
 public @interface ResourcePath {
-
+    String value() default "/";
 }

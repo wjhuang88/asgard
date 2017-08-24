@@ -67,6 +67,10 @@ public class ClasspathPackageScanner {
 
         // get file path
         URL url = cl.getResource(splashPath);
+        if (null == url) {
+            logger.info("No classes found in package: {}", basePackage);
+            return Collections.emptyList();
+        }
         String filePath = PathUtils.getRootPath(url);
 
         // Get classes in that package.
