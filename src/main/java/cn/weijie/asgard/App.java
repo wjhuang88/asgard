@@ -10,6 +10,7 @@ public class App {
         AsgardServer server = AsgardServer.INSTANCE;
         server.scan("cn.weijie.asgard");
         server.route("test/:id", new Pair<>(MIME.ALL, MIME.ALL), HttpMethod.GET, requestBody -> requestBody.put("sig", "response")).run();
+        server.shutdown();
     }
 
 }
