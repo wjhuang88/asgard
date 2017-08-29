@@ -196,8 +196,8 @@ object AsgardServer {
     /**
      * 扫描包路径[packageName]下的所有业务类
      */
-    fun scan(packageName: String) {
-        scanRunner = {
+    fun scan(vararg packageNames: String) {
+        scanRunner = { for (packageName in packageNames) {
             try {
                 ClasspathPackageScanner(packageName).fullyQualifiedClassNameList.forEach {
                     val annotationReader = AnnotationReader(Class.forName(it))
@@ -209,8 +209,7 @@ object AsgardServer {
             } catch (e: Exception) {
                 log.error("Scan package: $packageName fail", e)
             }
-        }
-
+        }}
     }
 }
 

@@ -11,7 +11,7 @@ import io.vertx.ext.web.RoutingContext
 import io.vertx.ext.web.handler.StaticHandler
 import kotlinx.coroutines.experimental.launch
 
-private val log : Logger = LoggerFactory.getLogger(Router::class.java.name + " -- [Register]")
+private val log : Logger = LoggerFactory.getLogger("${Router::class.java.name} -- [Register]")
 
 // 静态资源路由注册
 internal fun Router.registerStatic(staticRouterMap : Map<String, String>) = also { router ->

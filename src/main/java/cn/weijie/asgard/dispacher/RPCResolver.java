@@ -49,22 +49,7 @@ public class RPCResolver implements EndpointResolver {
                     prefixPath + "/" + actionPath,
                     new Pair<>(MIME.APPLICATION_JSON, MIME.APPLICATION_JSON),
                     HttpMethod.POST,
-                    request -> {
-                        Parameter[] parameters = m.getParameters();
-                        List<Object> args = new ArrayList<>(parameters.length);
-                        for (Parameter p : parameters) {
-                            Object argInstance = buildParameter(p, request);
-                            args.add(argInstance);
-                        }
-                        Object result = null;
-                        try {
-                            result = m.invoke(target, args.toArray());
-                        } catch (IllegalAccessException | InvocationTargetException e) {
-                            log.error("Method: {} from class: {} cannot be invoked successfully", e, m.getName(), clazz.getName());
-                        }
-                        log.debug("Method: {} from class: {} be invoked", m.getName(), clazz.getName());
-                        return buildResult(result);
-                    });
+                    request -> resolveHandler(m, request, target, clazz));
         }
     }
 }

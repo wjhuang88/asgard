@@ -1,5 +1,6 @@
 package cn.weijie.asgard.endpoint.restful;
 
+import cn.weijie.asgard.definition.MIME;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
@@ -12,5 +13,6 @@ import java.lang.annotation.Target;
 @Inherited
 @Documented
 public @interface POST {
-
+    String produce() default MIME.APPLICATION_JSON;
+    String consume() default MIME.APPLICATION_JSON;
 }

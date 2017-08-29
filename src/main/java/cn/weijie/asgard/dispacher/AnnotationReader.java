@@ -27,6 +27,7 @@ public class AnnotationReader<T> {
         } else if (isRestful()) {
             typeName = "RESTful";
             annotation = ResourcePath.class;
+            resolver = new RestfulResolver(target);
         } else if (isStream()) {
             typeName = "Stream";
             annotation = Files.class;
