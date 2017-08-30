@@ -39,8 +39,8 @@ internal fun Router.register(records : Set<Quadruple<String, Pair<String, String
                     log.debug("Received request to {}", request.uri())
                 }
                 // 业务代码输入对象中加入请求信息
-                body.put(REQUEST_FIELD.HEADERS, JsonObject().handleParams(request.headers()))
-                        .put(REQUEST_FIELD.PARAMS, JsonObject().handleParams(request.params()))
+                body.put(REQUEST_FIELD.HEADERS, HeaderResolver(it))
+                        .put(REQUEST_FIELD.PARAMS, ParameterResolver(it))
                         .put(REQUEST_FIELD.URI, request.uri())
                         .put(REQUEST_FIELD.HOST, request.host())
                         .put(REQUEST_FIELD.PATH, request.path())

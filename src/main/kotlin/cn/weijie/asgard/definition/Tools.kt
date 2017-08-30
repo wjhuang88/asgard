@@ -4,6 +4,7 @@ import com.google.common.collect.Maps
 import io.vertx.core.Vertx
 import io.vertx.core.buffer.Buffer
 import io.vertx.core.json.Json
+import io.vertx.core.json.JsonArray
 import io.vertx.core.json.JsonObject
 import io.vertx.ext.web.Cookie
 import io.vertx.ext.web.RoutingContext
@@ -29,6 +30,42 @@ interface TemplateAdapter {
     fun resolve(data : JsonObject) : Buffer
 }
 
+/**
+ * 代理Request数据
+ */
+class RequestResolver(private val json: JsonObject) {
+    fun getHeaders() = json.getJsonObject(REQUEST_FIELD.HEADERS).map as HeaderResolver
+    fun getParams() = json.getJsonObject(REQUEST_FIELD.PARAMS).map as ParameterResolver
+    fun getCookies() = json.getJsonObject(REQUEST_FIELD.COOKIES).map as CookieResolver
+    fun getSessions() = json.getJsonObject(REQUEST_FIELD.SESSION).map as SessionResolver
+
+    fun getHeader(key: String) = json.getJsonObject(REQUEST_FIELD.HEADERS).getJsonArray(key)?.list?.map { it.toString() }
+    fun getSingleHeader(key: String) = getHeader(key)?.get(0)
+
+    fun getParam(key: String) = json.getJsonObject(REQUEST_FIELD.PARAMS).getJsonArray(key)?.list?.map { it.toString() }
+    fun getSingleParam(key: String) = getParam(key)?.get(0)
+
+    fun getRequestBody() = json.map[REQUEST_FIELD.INPUT]
+    fun getRequestBodyAsString() = getRequestBody() as String
+    fun getRequestBodyAsJsonObject() = getRequestBody() as JsonObject
+    fun getRequestBodyAsJsonArray() = getRequestBody() as JsonArray
+}
+
+/**
+ * 代理请求中的params值
+ */
+class ParameterResolver(rc: RoutingContext) : MutableMap<String, Any>
+    by JsonObject().handleParams(rc.request().params()).map
+
+/**
+ * 代理请求中的header值
+ */
+class HeaderResolver(rc: RoutingContext) : MutableMap<String, Any>
+    by JsonObject().handleParams(rc.request().headers()).map
+
+/**
+ * 一个MutableMap.MutableEntry<K, V>]的简单实现
+ */
 private class SimpleEntry<K, V>(override val key: K, override var value: V) : MutableMap.MutableEntry<K, V> {
     override fun setValue(newValue: V): V {
         val oldValue = value
@@ -37,6 +74,9 @@ private class SimpleEntry<K, V>(override val key: K, override var value: V) : Mu
     }
 }
 
+/**
+ * 扩展[Cookie]对象，添加转换到[JsonObject]的方法
+ */
 private fun Cookie.toJsonObject() = mapOf(
         Pair("name", name),
         Pair("value", value),
@@ -45,6 +85,10 @@ private fun Cookie.toJsonObject() = mapOf(
         Pair("isChanged", isChanged)
 ).run { JsonObject(this) }
 
+/**
+ * 扩展[JsonObject]，添加转换为[Cookie]的方法
+ * @see toJsonObject
+ */
 private fun JsonObject.toCookie(): Cookie {
     val cookie = Cookie.cookie(getString("name"), getString("value"))
     cookie.domain = getString("domain")
@@ -53,7 +97,10 @@ private fun JsonObject.toCookie(): Cookie {
 }
 
 /**
- * 定义cookie处理器
+ * 定义*cookie*处理器
+ *
+ * @property rc 路由处理上下文
+ * @constructor 创建cookie处理器
  */
 class CookieResolver(private val rc: RoutingContext) : MutableMap<String, JsonObject> {
 
@@ -113,6 +160,9 @@ class CookieResolver(private val rc: RoutingContext) : MutableMap<String, JsonOb
 
 /**
  * 定义session处理器，需要提供路由请求上下文对象[rc]
+ *
+ * @property rc 路由处理上下文
+ * @constructor 创建cookie处理器
  */
 class SessionResolver(private val rc: RoutingContext) : MutableMap<String, String> by rc.session().transToMap() {
 
@@ -126,7 +176,7 @@ class SessionResolver(private val rc: RoutingContext) : MutableMap<String, Strin
 }
 
 /**
- * 创建一个Session对象的代理Map
+ * 创建一个[Session]对象的代理Map
  */
 private fun Session.transToMap() = data().let({
     Maps.transformValues(it, {

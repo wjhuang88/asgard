@@ -2,8 +2,11 @@ package cn.weijie.asgard.dispacher;
 
 import cn.weijie.asgard.AsgardServer;
 import cn.weijie.asgard.definition.CookieResolver;
+import cn.weijie.asgard.definition.HeaderResolver;
+import cn.weijie.asgard.definition.ParameterResolver;
 import cn.weijie.asgard.definition.REQUEST_FIELD;
 import cn.weijie.asgard.definition.RESPONSE_FIELD;
+import cn.weijie.asgard.definition.RequestResolver;
 import cn.weijie.asgard.definition.SessionResolver;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -29,6 +32,15 @@ public interface EndpointResolver {
             return new JsonObject()
                     .put(REQUEST_FIELD.INPUT, request.getValue(REQUEST_FIELD.INPUT))
                     .put(REQUEST_FIELD.PARAMS, request.getValue(REQUEST_FIELD.PARAMS));
+        }
+        if (RequestResolver.class.isAssignableFrom(type)) {
+            return new RequestResolver(request);
+        }
+        if (HeaderResolver.class.isAssignableFrom(type)) {
+            return request.getJsonObject(REQUEST_FIELD.HEADERS).getMap();
+        }
+        if (ParameterResolver.class.isAssignableFrom(type)) {
+            return request.getJsonObject(REQUEST_FIELD.PARAMS).getMap();
         }
         if (CookieResolver.class.isAssignableFrom(type)) {
             return request.getJsonObject(REQUEST_FIELD.COOKIES).getMap();
