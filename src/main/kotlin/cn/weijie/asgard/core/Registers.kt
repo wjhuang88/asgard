@@ -1,7 +1,6 @@
 package cn.weijie.asgard.core
 
 import cn.weijie.asgard.definition.*
-import cn.weijie.asgard.tool.PathUtils
 import io.vertx.core.http.HttpHeaders
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
