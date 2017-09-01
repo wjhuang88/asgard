@@ -39,37 +39,8 @@ internal fun Router.registerStatic(staticRouterMap : Set<Quadruple<String, Strin
 internal fun Router.register(records : Set<Quadruple<String, Pair<String, String?>, HttpMethod?, suspend (JsonObject?) -> JsonObject>>) = also { router ->
     records.forEach { (routePath, contentType, httpMethod, routeHandler) ->
         val registerHandler: (RoutingContext) -> Unit = { it: RoutingContext ->
-            val request = it.request()
-            val response = it.response()
-            // 创建协程运行用户请求处理器
-            fun runHandler(body : JsonObject) = launch(VertxContextDispatcher) {
-                if (log.isDebugEnabled) {
-                    log.debug("Received request to {}", request.uri())
-                }
-                // 业务代码输入对象中加入请求信息
-                body.put(REQUEST_FIELD.HEADERS, HeaderResolver(it))
-                        .put(REQUEST_FIELD.PARAMS, ParameterResolver(it))
-                        .put(REQUEST_FIELD.URI, request.uri())
-                        .put(REQUEST_FIELD.HOST, request.host())
-                        .put(REQUEST_FIELD.PATH, request.path())
-                        .put(REQUEST_FIELD.QUERY, request.query())
-                        .put(REQUEST_FIELD.COOKIES, CookieResolver(it))
-                        .put(REQUEST_FIELD.SESSION, SessionResolver(it))
-                it.fileUploads().let { files ->
-                    if (!files.isEmpty()) {
-                        body.put(REQUEST_FIELD.UPLOAD_FILES, files)
-                    }
-                }
-                if (log.isDebugEnabled) {
-                    log.debug("Request data: {}", body)
-                }
-                val result = routeHandler(body)
-                val resContentType = contentType.second ?: templateAdapter.contentType()
-                response.putHeader(HttpHeaders.CONTENT_TYPE, resContentType)
-                response.end(templateAdapter.resolve(result))
-            }
             // 执行分发
-            it.dispatch(::runHandler)
+            it.dispatch(runHandler(it)(routeHandler)(contentType))
         }
         val route = router.route(routePath).consumes(contentType.first)
         if (null != contentType.second && contentType.second != MIME.ALL) {
@@ -81,4 +52,35 @@ internal fun Router.register(records : Set<Quadruple<String, Pair<String, String
         route.handler(registerHandler)
         log.info("Bind routing handler for path: '{}' with content-type: '{}' via method: '{}'", routePath, contentType, httpMethod ?: "*")
     }
+}
+
+// 创建协程运行用户请求处理器
+private fun runHandler(rc: RoutingContext)
+        = fun(rh: suspend (JsonObject?) -> JsonObject)
+        = fun(ct: Pair<String, String?>)
+        = fun(body : JsonObject) = launch(VertxContextDispatcher) {
+    if (log.isDebugEnabled) {
+        log.debug("Received request to {}", rc.request().uri())
+    }
+    // 业务代码输入对象中加入请求信息
+    body.put(REQUEST_FIELD.HEADERS, HeaderResolver(rc))
+            .put(REQUEST_FIELD.PARAMS, ParameterResolver(rc))
+            .put(REQUEST_FIELD.URI, rc.request().uri())
+            .put(REQUEST_FIELD.HOST, rc.request().host())
+            .put(REQUEST_FIELD.PATH, rc.request().path())
+            .put(REQUEST_FIELD.QUERY, rc.request().query())
+            .put(REQUEST_FIELD.COOKIES, CookieResolver(rc))
+            .put(REQUEST_FIELD.SESSION, SessionResolver(rc))
+    rc.fileUploads().let { files ->
+        if (!files.isEmpty()) {
+            body.put(REQUEST_FIELD.UPLOAD_FILES, files)
+        }
+    }
+    if (log.isDebugEnabled) {
+        log.debug("Request data: {}", body)
+    }
+    val result = rh(body)
+    val resContentType = ct.second ?: templateAdapter.contentType()
+    rc.response().putHeader(HttpHeaders.CONTENT_TYPE, resContentType)
+    rc.response().end(templateAdapter.resolve(result))
 }
