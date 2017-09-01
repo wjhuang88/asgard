@@ -6,6 +6,8 @@ import cn.weijie.asgard.endpoint.statics.WebRoot;
 import cn.weijie.asgard.endpoint.stream.Files;
 import cn.weijie.asgard.endpoint.template.Pages;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AnnotationReader<T> {
 
@@ -15,7 +17,7 @@ public class AnnotationReader<T> {
 
     private String typeName = "Unknown";
 
-    private EndpointResolver resolver;
+    private List<EndpointResolver> resolvers = new ArrayList<>();
 
     @SuppressWarnings("unchecked")
     public AnnotationReader(Class<T> target) {
@@ -23,11 +25,11 @@ public class AnnotationReader<T> {
         if (isRPC()) {
             typeName = "RPC";
             annotation = RPC.class;
-            resolver = new RPCResolver(target);
+            resolvers.add(new RPCResolver(target));
         } else if (isRestful()) {
             typeName = "RESTful";
             annotation = ResourcePath.class;
-            resolver = new RestfulResolver(target);
+            resolvers.add(new RestfulResolver(target));
         } else if (isStream()) {
             typeName = "Stream";
             annotation = Files.class;
@@ -37,6 +39,7 @@ public class AnnotationReader<T> {
         } else if (isStatic()) {
             typeName = "Static";
             annotation = WebRoot.class;
+            resolvers.add(new StaticResolver(target));
         }
     }
 
@@ -72,7 +75,7 @@ public class AnnotationReader<T> {
         return annotation;
     }
 
-    public EndpointResolver getResolver() {
-        return resolver;
+    public List<EndpointResolver> getResolvers() {
+        return resolvers;
     }
 }

@@ -163,8 +163,8 @@ object AsgardServer {
     /**
      * 注册静态资路由信息，将[path]路由到[root]目录中
      */
-    fun routeStatic(path : String, root : String) {
-        staticRouterMap.put(path, root)
+    fun routeStatic(path: String, root: String, produce: String, index: String) {
+        staticRouterMap.add(Quadruple(path, root, produce, index))
     }
 
     /**
@@ -194,22 +194,22 @@ object AsgardServer {
     private var scanRunner: () -> Unit = {}
 
     /**
-     * 扫描包路径[packageName]下的所有业务类
+     * 扫描包路径[packageNames]下的所有业务类
      */
     fun scan(vararg packageNames: String) {
-        scanRunner = { for (packageName in packageNames) {
+        scanRunner = fun() = packageNames.forEach { packageName ->
             try {
                 ClasspathPackageScanner(packageName).fullyQualifiedClassNameList.forEach {
                     val annotationReader = AnnotationReader(Class.forName(it))
                     if (log.isDebugEnabled) {
                         log.debug("Resolving {} class: {}", annotationReader.endpointTypeName, it)
                     }
-                    annotationReader.resolver?.resolve(this)
+                    annotationReader.resolvers?.forEach { it.resolve(this) }
                 }
             } catch (e: Exception) {
                 log.error("Scan package: $packageName fail", e)
             }
-        }}
+        }
     }
 }
 

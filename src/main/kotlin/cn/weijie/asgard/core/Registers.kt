@@ -1,6 +1,7 @@
 package cn.weijie.asgard.core
 
 import cn.weijie.asgard.definition.*
+import cn.weijie.asgard.tool.PathUtils
 import io.vertx.core.http.HttpHeaders
 import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
@@ -14,15 +15,23 @@ import kotlinx.coroutines.experimental.launch
 private val log : Logger = LoggerFactory.getLogger("${Router::class.java.name} -- [Register]")
 
 // 静态资源路由注册
-internal fun Router.registerStatic(staticRouterMap : Map<String, String>) = also { router ->
+internal fun Router.registerStatic(staticRouterMap : Set<Quadruple<String, String, String?, String?>>) = also { router ->
     if (staticRouterMap.isEmpty()) {
         router.route("/static/*").handler(StaticHandler.create().setWebRoot("static"))
-        log.info("Bind static handler for path: '/static/*' to root: 'static'")
+        log.info("Bind static handler for path: '/static/*' to root dir: 'static'")
     } else {
-        staticRouterMap.forEach { (path, root) ->
+        staticRouterMap.forEach { (path, root, produce, index) ->
             val realPath = path.prependSlash()
-            router.route(realPath).handler(StaticHandler.create().setWebRoot(root))
-            log.info("Bind static handler for path: {} to root: {}", realPath, root)
+            val route = router.route(realPath)
+            val staticHandler = StaticHandler.create()
+            produce?.let { route.produces(it) }
+            index?.let { staticHandler.setIndexPage(it) }
+            if (root.startsWith("/")) {
+                staticHandler.setAllowRootFileSystemAccess(true)
+            }
+            staticHandler.setWebRoot(root)
+            route.handler(staticHandler)
+            log.info("Bind static handler for path: '{}' to root dir: '{}'", realPath, root)
         }
     }
 }

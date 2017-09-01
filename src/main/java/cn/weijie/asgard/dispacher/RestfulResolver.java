@@ -13,6 +13,7 @@ import io.vertx.core.http.HttpMethod;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import kotlin.Pair;
+import org.joor.Reflect;
 
 public class RestfulResolver implements EndpointResolver {
 

@@ -1,5 +1,6 @@
 package cn.weijie.asgard.endpoint.statics;
 
+import cn.weijie.asgard.definition.MIME;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
@@ -12,5 +13,8 @@ import java.lang.annotation.Target;
 @Inherited
 @Documented
 public @interface WebRoot {
-    String value() default "/";
+    String path() default "/";
+    String dir();
+    String produce() default MIME.TEXT_HTML;
+    String index() default "/index.html";
 }

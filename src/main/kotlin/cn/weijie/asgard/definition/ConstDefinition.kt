@@ -11,8 +11,14 @@ object MIME {
     const val TEXT_CSS = "text/css"
     const val APPLICATION_JAVASCRIPT = "application/javascript"
     const val APPLICATION_JSON = "application/json"
+    const val APPLICATION_XML = "application/xml"
     const val MULTIPART_FORM_DATA = "multipart/form-data"
     const val APPLICATION_FORM_URLENCODED = "application/x-www-form-urlencoded"
+    const val IMAGE_BMP = "image/bmp"
+    const val IMAGE_GIF = "image/gif"
+    const val IMAGE_JPEG = "image/jpeg"
+    const val IMAGE_SVG = "image/svg+xml"
+    const val IMAGE_TIFF = "image/tiff"
 }
 
 object REQUEST_FIELD {

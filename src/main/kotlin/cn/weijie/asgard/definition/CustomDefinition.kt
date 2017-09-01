@@ -15,7 +15,7 @@ internal val log : Logger = LoggerFactory.getLogger(AsgardServer::class.java)
 internal val routerPool = mutableSetOf<Quadruple<String, Pair<String, String?>, HttpMethod?, suspend (JsonObject?) -> JsonObject>>()
 
 // 静态资源路由映射
-internal val staticRouterMap = mutableMapOf<String, String>()
+internal val staticRouterMap = mutableSetOf<Quadruple<String, String, String?, String?>>()
 
 // 收集所有Content-Type处理器
 internal val contentTypePool = mutableMapOf<String, MutableList<(Buffer, (JsonObject) -> Job) -> Unit>>()

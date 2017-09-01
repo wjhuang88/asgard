@@ -4,7 +4,9 @@ import cn.weijie.asgard.definition.MIME;
 import io.vertx.core.Future;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonObject;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import kotlin.Pair;
 
 public class App {
@@ -15,5 +17,4 @@ public class App {
         server.route("test/:id", new Pair<>(MIME.ALL, MIME.ALL), HttpMethod.GET, requestBody -> requestBody.put("sig", "response")).run();
         server.shutdown();
     }
-
 }
