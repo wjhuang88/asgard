@@ -54,11 +54,12 @@ internal fun Router.register(records : Set<Quadruple<String, Pair<String, String
     }
 }
 
-// 创建协程运行用户请求处理器
+// 创建协程运行用户请求处理器，科里化处理
 private fun runHandler(rc: RoutingContext)
         = fun(rh: suspend (JsonObject?) -> JsonObject)
         = fun(ct: Pair<String, String?>)
         = fun(body : JsonObject) = launch(VertxContextDispatcher) {
+
     if (log.isDebugEnabled) {
         log.debug("Received request to {}", rc.request().uri())
     }

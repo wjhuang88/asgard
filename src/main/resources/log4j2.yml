@@ -19,6 +19,6 @@ Configuration:
         Pattern: ${sys:CONSOLE_LOG_PATTERN}
   Loggers:
     Root:
-      level: debug
+      level: info
       AppenderRef:
         ref: Console
